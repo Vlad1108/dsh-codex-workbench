@@ -182,10 +182,7 @@ export function CodexQuota({ directory, loadQuota, redeemReset, useLocale, t }: 
             <button type="button" onClick={() => setConfirm(false)}>{t('cancel')}</button>
             <button type="button" disabled={resetBusy} onClick={() => { void applyReset() }}>{resetBusy ? t('reset.pending') : t('reset.confirm')}</button>
           </div>
-        </> : <>
-          {quota.resetCredits.applicable === 0 ? <p>{t('reset.unavailable')}</p> : null}
-          <button type="button" onClick={() => { setResetMessage(undefined); setConfirm(true); setPinned(true) }}>{t('reset.action')}</button>
-        </>}
+        </> : <button type="button" onClick={() => { setResetMessage(undefined); setConfirm(true); setPinned(true) }}>{t('reset.action')}</button>}
       </div> : null}
       {resetMessage !== undefined && resetMessage !== 'unknown' ? <p className={css.message} role="status">{t(`reset.${resetMessage}`)}</p> : null}
     </div>, document.body)}

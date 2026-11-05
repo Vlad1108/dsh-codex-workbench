@@ -24,12 +24,11 @@ const quota = (applicable: number, available = 2) => ({
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks() })
 
-it('warns when OpenAI reports no applicable resets', async () => {
+it('offers saved resets when OpenAI reports none as applicable', async () => {
   const redeemReset = vi.fn()
   render(<CodexQuota directory={directory} loadQuota={async () => quota(0)} redeemReset={redeemReset} useLocale={useLocale} t={t} />)
   fireEvent.click(await screen.findByRole('button', { name: /Codex quota remaining/ }))
   expect(await screen.findByText('Saved resets: 2')).toBeTruthy()
-  expect(screen.getByText('OpenAI reports no applicable resets; the request may be declined.')).toBeTruthy()
   expect(screen.getByText('Use a reset')).toBeTruthy()
   expect(redeemReset).not.toHaveBeenCalled()
 })
