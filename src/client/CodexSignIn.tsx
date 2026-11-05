@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CodexQuota, CodexSignInAttemptId, CodexStatus, ModelsOperations } from './operations.ts'
+import type { CodexSignInAttemptId, CodexStatus, ModelsOperations } from './operations.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -14,23 +14,12 @@ export function CodexSignIn({ operations, t }: Props): ReactNode {
   const [view, setView] = useState<CodexStatus>()
   const [failed, setFailed] = useState(false)
   const [manual, setManual] = useState('')
-  const [quota, setQuota] = useState<CodexQuota>()
-  const [quotaFailed, setQuotaFailed] = useState(false)
-  const [quotaRevision, setQuotaRevision] = useState(0)
   const popup = useRef<Window | null>(null)
   const navigated = useRef(false)
   const mounted = useRef(true)
   const attempt = useRef<CodexSignInAttemptId | undefined>(undefined)
   const revision = useRef(0)
   const active = view?.phase === 'starting' || view?.phase === 'waiting'
-
-  useEffect(() => {
-    if (!view?.configured) { setQuota(undefined); setQuotaFailed(false); return }
-    let live = true
-    void operations.quota().then(value => { if (live) { setQuota(value); setQuotaFailed(false) } })
-      .catch(() => { if (live) setQuotaFailed(true) })
-    return () => { live = false }
-  }, [operations, view?.configured, quotaRevision])
 
   useEffect(() => {
     mounted.current = true
@@ -96,21 +85,6 @@ export function CodexSignIn({ operations, t }: Props): ReactNode {
       {t('codexSignIn')}
     </button>
     {view?.configured ? <p className={styles['savedNotice']}>{t('accountSignedIn')}</p> : null}
-    {view?.configured ? <div className={styles['field']}>
-      <span className={styles['fieldLabel']}>{t('codexQuota')}</span>
-      {quota?.limits.map(limit => <div key={limit.name}>
-        <span>{limit.name}</span>
-        {limit.windows.map(window => <p className={styles['advancedHint']} key={window.windowSeconds}>
-          {window.windowSeconds % 86400 === 0 ? `${window.windowSeconds / 86400}d`
-            : window.windowSeconds % 3600 === 0 ? `${window.windowSeconds / 3600}h` : `${Math.ceil(window.windowSeconds / 60)}m`}
-          {' · '}{Math.round(100 - window.usedPercent)}%
-          {window.resetAt === undefined ? null : ` · ${t('codexQuotaReset')}: ${new Date(window.resetAt * 1000).toLocaleString()}`}
-        </p>)}
-      </div>)}
-      {quota && quota.limits.length === 0 ? <p className={styles['advancedHint']}>{t('codexQuotaEmpty')}</p> : null}
-      {quotaFailed ? <p className={styles['error']}>{t('codexQuotaFailed')}</p> : null}
-      <button type="button" className={styles['secondaryButton']} onClick={() => { setQuotaRevision(value => value + 1) }}>{t('codexQuotaRefresh')}</button>
-    </div> : null}
     {active ? <p className={styles['advancedHint']}>{t('codexWaiting')}</p> : null}
     {active && view.url ? <a href={view.url} target="_blank" rel="noopener noreferrer">{t('codexOpen')}</a> : null}
     {active && view.prompt && view.id ? <>
