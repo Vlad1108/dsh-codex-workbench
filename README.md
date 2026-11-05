@@ -7,8 +7,10 @@ Codex Workbench adds ChatGPT sign-in and subscription quota display to DSH Web. 
 Install the bundle and restart DSH Web:
 
 ```sh
-dsh plugin --profile web add github:Vlad1108/dsh-codex-workbench
+dsh plugin --profile web add dsh-codex-workbench
 ```
+
+Alternatively, install from GitHub with `dsh plugin --profile web add github:Vlad1108/dsh-codex-workbench`.
 
 Open **Settings → Models**, add the **openai-codex** provider, select **Sign in with ChatGPT**, complete the browser login, and apply the provider settings. The model picker uses the catalog supplied by DSH.
 
