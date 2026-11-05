@@ -1,3 +1,7 @@
+- id: web
+  config:
+    searchProvider: openai-codex
+    fetchProvider: http
 - insert:
     - id: dsh-codex-workbench
       name: dsh-codex-workbench

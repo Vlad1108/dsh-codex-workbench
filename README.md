@@ -18,7 +18,11 @@ Models absent from the bundled catalog can be added through DSH's model settings
 
 ## Web search
 
-The bundle registers the `openai-codex` search provider. Select it in DSH Web Search settings to use it; installing the bundle does not replace your current search provider. The bundle's configuration provides `searchModel`, `searchMode` (`cached`, `indexed`, or `live`), `searchContextSize`, `searchMaxOutputTokens`, and `quotaTimeoutMs`.
+The bundle registers and selects the `openai-codex` search provider and selects `http` for fetching pages. After signing in, `web_search` uses Codex when that tool is enabled for the agent. The selection applies to the whole profile, including when another model is active. Disabling the bundle removes its selection.
+
+An existing profile or home `cordis.patch.yml` entry for `web` takes precedence over the bundle. A later bundle may also replace it. To choose another provider, set both `searchProvider` and `fetchProvider` in the profile's `web` entry; DSH replaces that entry's whole configuration. Upgrading from 0.1.1 enables Codex search and HTTP fetching where no later configuration overrides the bundle.
+
+The bundle's configuration provides `searchModel`, `searchMode` (`cached`, `indexed`, or `live`), `searchContextSize`, `searchMaxOutputTokens`, and `quotaTimeoutMs`.
 
 ## Privacy and compatibility
 
