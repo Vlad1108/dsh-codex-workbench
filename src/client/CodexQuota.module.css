@@ -81,4 +81,5 @@
 
 @media (hover: hover) {
   .quota:hover { background: var(--dsw-alias-interactive-bg-hover); }
+  .actions button:not(:disabled):hover { background: var(--dsw-alias-interactive-bg-hover); }
 }
