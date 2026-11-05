@@ -1,6 +1,6 @@
 {
   "name": "dsh-codex-workbench",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Codex sign-in, model access, subscription quota and search for DeepSeek Harness.",
   "repository": { "type": "git", "url": "https://github.com/Vlad1108/dsh-codex-workbench.git" },
   "homepage": "https://github.com/Vlad1108/dsh-codex-workbench#readme",

@@ -3,7 +3,8 @@ import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore }
 import { createPortal } from 'react-dom'
 import { IconGaugeOutlineRegular, useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
 import type { CodexQuotaView } from '../types.ts'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import css from './CodexQuota.module.css'
@@ -14,6 +15,7 @@ type Quota = CodexQuotaView
 export interface CodexQuotaInjected {
   directory: SnapshotStore<ModelDirectoryState>
   loadQuota: () => Promise<Quota>
+  hooks: { locale: HostObservable<LocaleSnapshot> }
 }
 
 function windowLabel(seconds: number): string {
@@ -22,20 +24,28 @@ function windowLabel(seconds: number): string {
   return `${Math.ceil(seconds / 60)}m`
 }
 
-function resetLabel(seconds: number | undefined, duration: number, fallback: string): string {
+function dateLocale(locale: string): string {
+  try { return Intl.getCanonicalLocales(locale)[0] ?? 'en' } catch (error) {
+    if (error instanceof RangeError) return 'en'
+    throw error
+  }
+}
+
+function resetLabel(seconds: number | undefined, duration: number, fallback: string, locale: string): string {
   if (seconds === undefined) return fallback
   const date = new Date(seconds * 1000)
   const now = new Date()
   const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
   if (duration < 86400) {
-    return sameDay ? date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-      : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    return sameDay ? date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
+      : date.toLocaleString(locale, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   }
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
 }
 
 /** Display and refresh quota only for a selected Codex model. */
-export function CodexQuota({ directory, loadQuota, t }: CodexQuotaInjected & PropsLocale<'codex-workbench'>) {
+export function CodexQuota({ directory, loadQuota, useLocale, t }: InjectFace<CodexQuotaInjected> & PropsLocale<'codex-workbench'>) {
+  const locale = dateLocale(useLocale(snapshot => snapshot.active))
   const state = useSyncExternalStore(fn => directory.subscribe(fn), () => directory.getSnapshot())
   const eligible = state.current?.provider === 'openai-codex'
   const [quota, setQuota] = useState<Quota>()
@@ -85,7 +95,7 @@ export function CodexQuota({ directory, loadQuota, t }: CodexQuotaInjected & Pro
   const details = windows.map(window => t('quota.window', {
     window: windowLabel(window.windowSeconds),
     percent: Math.round(100 - window.usedPercent),
-    reset: window.resetAt === undefined ? t('quota.resetUnknown') : new Date(window.resetAt * 1000).toLocaleString(),
+    reset: window.resetAt === undefined ? t('quota.resetUnknown') : new Date(window.resetAt * 1000).toLocaleString(locale),
   })).join(' • ')
   const label = error ? t('quota.error') : quota === undefined ? t('quota.loading')
     : windows.length === 0 ? t('quota.empty') : t('quota.summary', { details })
@@ -114,7 +124,7 @@ export function CodexQuota({ directory, loadQuota, t }: CodexQuotaInjected & Pro
       {windows.length > 0 ? <div className={css.rows}>{windows.map(window => <div className={css.row} key={window.windowSeconds}>
         <span className={css.window}>{window.windowSeconds === 604800 ? t('quota.weekly') : windowLabel(window.windowSeconds)}</span>
         <span className={css.percent}>{Math.round(100 - window.usedPercent)}%</span>
-        <span className={css.reset}>{resetLabel(window.resetAt, window.windowSeconds, t('quota.resetUnknown'))}</span>
+        <span className={css.reset}>{resetLabel(window.resetAt, window.windowSeconds, t('quota.resetUnknown'), locale)}</span>
       </div>)}</div> : <p className={css.message}>{error ? t('quota.error') : quota === undefined ? t('quota.loading') : t('quota.empty')}</p>}
       {error && windows.length > 0 ? <p className={css.message}>{t('quota.error')}</p> : null}
     </div>, document.body)}
