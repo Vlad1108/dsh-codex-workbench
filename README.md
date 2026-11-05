@@ -12,7 +12,7 @@ dsh plugin --profile web add github:Vlad1108/dsh-codex-workbench
 
 Open **Settings → Models**, add the **openai-codex** provider, select **Sign in with ChatGPT**, complete the browser login, and apply the provider settings. The model picker uses the catalog supplied by DSH.
 
-The composer shows remaining quota beside the active Codex model. Hover or tap it to see the reset times. Clicking also refreshes the values.
+The composer shows the remaining five-hour quota beside the active Codex model, or the weekly quota when the account has no five-hour window. Hover or tap it to see the available windows and reset times. Clicking also refreshes the values.
 
 Models absent from the bundled catalog can be added through DSH's model settings.
 
