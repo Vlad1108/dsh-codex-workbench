@@ -14,6 +14,8 @@ Open **Settings → Models**, add the **openai-codex** provider, select **Sign i
 
 The composer shows the remaining five-hour quota beside the active Codex model, or the weekly quota when the account has no five-hour window. Hover or tap it to see the available windows and reset times. Clicking also refreshes the values.
 
+When OpenAI reports saved resets, the quota card shows how many remain and warns if OpenAI reports none as applicable. Confirming a reset asks OpenAI to consume one saved reset and restore eligible five-hour and weekly limits; their renewal times can change. If the response is lost, retry the same request from the card before using another reset. Availability and eligibility are determined by OpenAI.
+
 Models absent from the bundled catalog can be added through DSH's model settings.
 
 ## Web search

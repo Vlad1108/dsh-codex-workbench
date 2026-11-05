@@ -41,7 +41,7 @@ export function apply(ctx: Context): void {
     locale: 'codex-workbench',
     inject: sessionId => ({
       directory: ctx.modelDirectories.directoryFor(brandString<SessionId>(sessionId)).store,
-      loadQuota: operations.quota, hooks: { locale: ctx.locale },
+      loadQuota: operations.quota, redeemReset: operations.reset, hooks: { locale: ctx.locale },
     }),
   }, CodexQuota))
 }

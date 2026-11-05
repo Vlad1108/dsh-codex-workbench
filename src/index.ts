@@ -56,6 +56,10 @@ export function apply(ctx: Context, config: Config): void {
         switch (body.action) {
           case 'state': return reply(200, { ok: true, value: await signIn.state() })
           case 'quota': return reply(200, { ok: true, value: await signIn.quota() })
+          case 'reset':
+            if (typeof body.key !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.key)) return reply(400, { ok: false })
+            if (typeof body.owner !== 'string' || !/^[0-9a-f]{64}$/.test(body.owner)) return reply(400, { ok: false })
+            return reply(200, { ok: true, value: await signIn.reset(body.key, body.owner) })
           case 'start': return reply(200, { ok: true, value: await signIn.start() })
           case 'answer':
             if (typeof body.id !== 'string' || typeof body.value !== 'string' || body.value.length > 8192) return reply(400, { ok: false })

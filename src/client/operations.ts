@@ -1,4 +1,4 @@
-import type { CodexQuotaView, CodexSignInAttemptId, CodexSignInView } from '../types.ts'
+import type { CodexQuotaView, CodexResetOutcome, CodexSignInAttemptId, CodexSignInView } from '../types.ts'
 
 export type CodexStatus = CodexSignInView
 export type { CodexSignInAttemptId }
@@ -10,6 +10,7 @@ export interface ModelsOperations {
     cancel(id: CodexSignInAttemptId): Promise<CodexStatus>
     answer(id: CodexSignInAttemptId, value: string): Promise<CodexStatus>
     quota(): Promise<CodexQuota>
+    reset(key: string, owner: string): Promise<CodexResetOutcome>
   }
 }
 async function call<T>(action: string, parameters: object = {}): Promise<T> {
@@ -29,4 +30,5 @@ export const operations: NonNullable<ModelsOperations['codex']> = {
   cancel: id => call('cancel', { id }),
   answer: (id, value) => call('answer', { id, value }),
   quota: () => call('quota'),
+  reset: (key, owner) => call('reset', { key, owner }),
 }

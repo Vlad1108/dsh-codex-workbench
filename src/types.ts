@@ -39,4 +39,9 @@ export interface CodexQuotaLimit {
 export interface CodexQuotaView {
   /** Available limits, including the primary Codex limit. */
   limits: CodexQuotaLimit[]
+  /** Reset credits and how many currently apply to the account. */
+  resetCredits?: { available: number, applicable: number, owner?: string }
 }
+
+/** Result of asking OpenAI to use one saved reset. */
+export type CodexResetOutcome = 'reset' | 'nothing_to_reset' | 'no_credit' | 'already_redeemed'

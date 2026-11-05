@@ -68,6 +68,13 @@
 .percent, .reset { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .message { margin: 10px 0 0; }
 
+.actions { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--dsw-alias-border-l1); }
+.actions p { margin: 0 0 8px; }
+.actions p:last-child { margin-bottom: 0; }
+.actions button { border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-primary); padding: 4px 8px; font: inherit; cursor: pointer; }
+.actions button:disabled { opacity: .6; cursor: default; }
+.buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+
 .quota:focus-visible {
   outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
 }

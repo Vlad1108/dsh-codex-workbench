@@ -5,7 +5,7 @@ import { IconGaugeOutlineRegular, useAnchoredPosition, useDismissOnOutsidePointe
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { HostObservable, InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
-import type { CodexQuotaView } from '../types.ts'
+import type { CodexQuotaView, CodexResetOutcome } from '../types.ts'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import css from './CodexQuota.module.css'
 
@@ -15,6 +15,7 @@ type Quota = CodexQuotaView
 export interface CodexQuotaInjected {
   directory: SnapshotStore<ModelDirectoryState>
   loadQuota: () => Promise<Quota>
+  redeemReset: (key: string, owner: string) => Promise<CodexResetOutcome>
   hooks: { locale: HostObservable<LocaleSnapshot> }
 }
 
@@ -44,7 +45,7 @@ function resetLabel(seconds: number | undefined, duration: number, fallback: str
 }
 
 /** Display and refresh quota only for a selected Codex model. */
-export function CodexQuota({ directory, loadQuota, useLocale, t }: InjectFace<CodexQuotaInjected> & PropsLocale<'codex-workbench'>) {
+export function CodexQuota({ directory, loadQuota, redeemReset, useLocale, t }: InjectFace<CodexQuotaInjected> & PropsLocale<'codex-workbench'>) {
   const locale = dateLocale(useLocale(snapshot => snapshot.active))
   const state = useSyncExternalStore(fn => directory.subscribe(fn), () => directory.getSnapshot())
   const eligible = state.current?.provider === 'openai-codex'
@@ -54,20 +55,40 @@ export function CodexQuota({ directory, loadQuota, useLocale, t }: InjectFace<Co
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const [pinned, setPinned] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetMessage, setResetMessage] = useState<'unknown' | 'storage' | 'done' | 'nothing' | 'noCredit' | 'redeemed'>()
+  const [pendingReset, setPendingReset] = useState(false)
   const anchor = useRef<HTMLSpanElement | null>(null)
   const panel = useRef<HTMLDivElement | null>(null)
+  const suppressFocusOpen = useRef(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const panelId = useId()
+  const resetOwner = quota?.resetCredits?.owner
+  const storageKey = resetOwner === undefined ? undefined : `dsh-codex-reset:${resetOwner}`
   const open = eligible && (hovered || focused || pinned)
-  const close = useCallback(() => { setHovered(false); setFocused(false); setPinned(false) }, [])
+  const close = useCallback(() => { setHovered(false); setFocused(false); setPinned(false); setConfirm(false) }, [])
   const cancelClose = (): void => { if (closeTimer.current !== undefined) clearTimeout(closeTimer.current) }
   const queueClose = (): void => { cancelClose(); closeTimer.current = setTimeout(() => { setHovered(false) }, 150) }
   const position = useAnchoredPosition({ open, anchorRef: anchor, panelRef: panel, side: 'top', align: 'end', gap: 8, margin: 12 })
   useDismissOnOutsidePointer(anchor, open, close, panel)
   useEffect(() => () => { if (closeTimer.current !== undefined) clearTimeout(closeTimer.current) }, [])
   useEffect(() => {
+    if (!pinned || panel.current === null || panel.current.contains(document.activeElement)) return
+    panel.current.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+  }, [pinned])
+  useEffect(() => {
+    if (storageKey === undefined) { setPendingReset(false); return }
+    try { setPendingReset(localStorage.getItem(storageKey) !== null) } catch { setResetMessage('storage') }
+  }, [storageKey])
+  useEffect(() => {
     if (!open) return
-    const dismiss = (event: KeyboardEvent): void => { if (event.key === 'Escape') close() }
+    const dismiss = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      const restore = panel.current?.contains(document.activeElement) ?? false
+      close()
+      if (restore) { suppressFocusOpen.current = true; anchor.current?.querySelector('button')?.focus() }
+    }
     document.addEventListener('keydown', dismiss)
     return () => { document.removeEventListener('keydown', dismiss) }
   }, [close, open])
@@ -99,12 +120,34 @@ export function CodexQuota({ directory, loadQuota, useLocale, t }: InjectFace<Co
   })).join(' • ')
   const label = error ? t('quota.error') : quota === undefined ? t('quota.loading')
     : windows.length === 0 ? t('quota.empty') : t('quota.summary', { details })
+  const applyReset = async (): Promise<void> => {
+    if (resetBusy || storageKey === undefined || resetOwner === undefined) return
+    let key: string
+    try {
+      key = localStorage.getItem(storageKey) ?? crypto.randomUUID()
+      localStorage.setItem(storageKey, key)
+    } catch { setResetMessage('storage'); return }
+    setPendingReset(true)
+    setResetBusy(true)
+    setConfirm(false)
+    try {
+      const outcome = await redeemReset(key, resetOwner)
+      if (outcome !== 'reset' && outcome !== 'nothing_to_reset' && outcome !== 'no_credit' && outcome !== 'already_redeemed') throw new Error('Unknown reset outcome')
+      localStorage.removeItem(storageKey)
+      setPendingReset(false)
+      setResetMessage(outcome === 'reset' ? 'done' : outcome === 'nothing_to_reset' ? 'nothing' : outcome === 'no_credit' ? 'noCredit' : 'redeemed')
+      setRefresh(value => value + 1)
+    } catch { setResetMessage('unknown') } finally { setResetBusy(false) }
+  }
   return <span ref={anchor} className={css.anchor}
     onPointerEnter={event => { if (event.pointerType !== 'touch') { cancelClose(); setHovered(true) } }}
     onPointerLeave={queueClose}
   >
-    <button type="button" className={css.quota} aria-label={label} aria-describedby={open ? panelId : undefined}
-      onFocus={event => { if (event.currentTarget.matches(':focus-visible')) setFocused(true) }}
+    <button type="button" className={css.quota} aria-label={label} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? panelId : undefined}
+      onFocus={event => {
+        if (suppressFocusOpen.current) { suppressFocusOpen.current = false; return }
+        if (event.currentTarget.matches(':focus-visible')) setFocused(true)
+      }}
       onBlur={() => { setFocused(false) }}
       onClick={() => { setPinned(value => !value); setRefresh(value => value + 1) }}
     >{primary === undefined ? (error ? '!' : '…') : <>
@@ -115,8 +158,9 @@ export function CodexQuota({ directory, loadQuota, useLocale, t }: InjectFace<Co
       </svg>
       <span>{windowLabel(primary.windowSeconds)} {remaining}%</span>
     </>}</button>
-    {open && createPortal(<div id={panelId} ref={panel} className={css.panel} role="tooltip"
+    {open && createPortal(<div id={panelId} ref={panel} className={css.panel} role="dialog" aria-label={t('quota.title')}
       style={position ?? { visibility: 'hidden', left: 0, top: 0 }}
+      onFocus={() => setPinned(true)}
       onPointerEnter={event => { if (event.pointerType !== 'touch') { cancelClose(); setHovered(true) } }}
       onPointerLeave={queueClose}
     >
@@ -127,6 +171,23 @@ export function CodexQuota({ directory, loadQuota, useLocale, t }: InjectFace<Co
         <span className={css.reset}>{resetLabel(window.resetAt, window.windowSeconds, t('quota.resetUnknown'), locale)}</span>
       </div>)}</div> : <p className={css.message}>{error ? t('quota.error') : quota === undefined ? t('quota.loading') : t('quota.empty')}</p>}
       {error && windows.length > 0 ? <p className={css.message}>{t('quota.error')}</p> : null}
+      {quota?.resetCredits !== undefined && (quota.resetCredits.available > 0 || pendingReset) ? <div className={css.actions}>
+        <p>{t('reset.available', { count: quota.resetCredits.available })}</p>
+        {pendingReset ? <>
+          {!resetBusy ? <p role="status">{t('reset.unknown')}</p> : null}
+          <button type="button" disabled={resetBusy} onClick={() => { void applyReset() }}>{resetBusy ? t('reset.pending') : t('reset.retry')}</button>
+        </> : confirm ? <>
+          <p>{t('reset.confirmText')}</p>
+          <div className={css.buttons}>
+            <button type="button" onClick={() => setConfirm(false)}>{t('cancel')}</button>
+            <button type="button" disabled={resetBusy} onClick={() => { void applyReset() }}>{resetBusy ? t('reset.pending') : t('reset.confirm')}</button>
+          </div>
+        </> : <>
+          {quota.resetCredits.applicable === 0 ? <p>{t('reset.unavailable')}</p> : null}
+          <button type="button" onClick={() => { setResetMessage(undefined); setConfirm(true); setPinned(true) }}>{t('reset.action')}</button>
+        </>}
+      </div> : null}
+      {resetMessage !== undefined && resetMessage !== 'unknown' ? <p className={css.message} role="status">{t(`reset.${resetMessage}`)}</p> : null}
     </div>, document.body)}
   </span>
 }

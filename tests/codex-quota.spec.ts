@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 import type { AuthContext, CredentialStore } from '@earendil-works/pi-ai'
-import { parseCodexQuota, readCodexQuota } from '../src/codex-quota.ts'
+import { parseCodexQuota, readCodexQuota, redeemCodexReset } from '../src/codex-quota.ts'
 
 const credentials: CredentialStore = {
   read: async () => ({ type: 'oauth', access: 'private-token', refresh: 'private-refresh', expires: Date.now() + 3600000, accountId: 'account' }),
@@ -31,6 +32,33 @@ describe('Codex subscription quota', () => {
   it('rejects malformed windows instead of inventing quota', () => {
     expect(() => parseCodexQuota({ rate_limit: { primary_window: { used_percent: -1, limit_window_seconds: 18000 } } })).toThrow()
     expect(() => parseCodexQuota({ additional_rate_limits: {} })).toThrow()
+  })
+
+  it('reports saved and currently applicable resets separately', () => {
+    expect(parseCodexQuota({ rate_limit_reset_credits: { available_count: 2, applicable_available_count: 0 } }))
+      .toEqual({ limits: [], resetCredits: { available: 2, applicable: 0 } })
+    expect(() => parseCodexQuota({ rate_limit_reset_credits: { available_count: 1, applicable_available_count: 2 } })).toThrow()
+  })
+
+  it('uses the saved request identity and the correct Codex account for a reset', async () => {
+    const request = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => Response.json({ code: 'reset' }))
+    vi.stubGlobal('fetch', request)
+    const owner = createHash('sha256').update('account').digest('hex')
+    const key = '75256c51-cc9c-48e0-bd5f-1a2dcb93df1f'
+    await expect(redeemCodexReset({ credentials, authContext }, 15000, key, owner)).resolves.toBe('reset')
+    expect(request.mock.calls[0]?.[0]).toBe('https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume')
+    expect(request.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', redirect: 'error', body: JSON.stringify({ redeem_request_id: key }) })
+    expect(request.mock.calls[0]?.[1]?.headers).toMatchObject({ authorization: 'Bearer private-token', 'chatgpt-account-id': 'account' })
+    await expect(redeemCodexReset({ credentials, authContext }, 15000, key, 'different-account')).rejects.toThrow('account changed')
+    expect(request).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not claim a reset succeeded when its response is unknown', async () => {
+    const owner = createHash('sha256').update('account').digest('hex')
+    for (const response of [new Response('private', { status: 500 }), Response.json({ code: 'unexpected' })]) {
+      vi.stubGlobal('fetch', vi.fn(async () => response))
+      await expect(redeemCodexReset({ credentials, authContext }, 15000, 'same-request', owner)).rejects.toThrow('outcome unavailable')
+    }
   })
 
   it('reports a failed quota request without returning the response body', async () => {

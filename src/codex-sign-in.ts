@@ -3,9 +3,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type {} from '@deepseek-ai/dsh-authorization'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
-import type { CodexQuotaView, CodexSignInAttemptId, CodexSignInView } from './types.ts'
+import type { CodexQuotaView, CodexResetOutcome, CodexSignInAttemptId, CodexSignInView } from './types.ts'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
-import { readCodexQuota } from './codex-quota.ts'
+import { readCodexQuota, redeemCodexReset } from './codex-quota.ts'
 
 interface Attempt {
   id: CodexSignInAttemptId
@@ -21,6 +21,7 @@ const KEY = credentialKey('llm-pi-ai', 'openai-codex')
 export class CodexSignIn {
   private attempt: Attempt | undefined
   private quotaPending: Promise<CodexQuotaView> | undefined
+  private resetPending: { key: string, result: Promise<CodexResetOutcome> } | undefined
   private readonly lifetime = new AbortController()
 
   /**
@@ -52,6 +53,17 @@ export class CodexSignIn {
       .catch(() => { throw new Error('Codex quota unavailable; check the connection or sign in again') })
     this.quotaPending = pending
     try { return await pending } finally { if (this.quotaPending === pending) this.quotaPending = undefined }
+  }
+
+  /** Redeem one reset; concurrent calls must use the same idempotency key. */
+  async reset(key: string, owner: string): Promise<CodexResetOutcome> {
+    if (this.resetPending !== undefined) {
+      if (this.resetPending.key !== key) throw new Error('Another reset is in progress')
+      return this.resetPending.result
+    }
+    const result = redeemCodexReset({ credentials: credentialStoreFrom(this.ctx), authContext: authContextFrom(this.ctx) }, this.options.quotaTimeoutMs(), key, owner, this.lifetime.signal)
+    this.resetPending = { key, result }
+    try { return await result } finally { if (this.resetPending?.result === result) this.resetPending = undefined }
   }
 
   /**
